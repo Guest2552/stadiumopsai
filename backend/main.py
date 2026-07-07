@@ -25,7 +25,7 @@ app = FastAPI(
 )
 
 # SECURITY: Restrict CORS to specific frontend origins instead of wildcards ["*"]
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://stadiumopsai-68zu.vercel.app")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://stadiumopsai.vercel.app")
 
 app.add_middleware(
     CORSMiddleware,
