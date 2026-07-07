@@ -25,16 +25,15 @@ app = FastAPI(
 )
 
 # SECURITY: Restrict CORS to specific frontend origins instead of wildcards ["*"]
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://stadiumopsai-68zu.vercel.app")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_URL, "http://127.0.0.1:5173"], 
     allow_credentials=True,
-    allow_methods=["GET", "POST"], # Restrict allowed methods
+    allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type"],
 )
-
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # --- Global State & Mock Data ---
 app_state = {
