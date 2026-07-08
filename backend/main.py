@@ -29,43 +29,17 @@ load_dotenv()
 
 app = FastAPI(title="StadiumOps AI: FIFA 2026 Core Engine", version="5.0.0")
 
+# SECURITY: Restrict CORS to specific frontend origins instead of wildcards ["*"]
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False, 
-    allow_methods=["*"], 
-    allow_headers=["*"], 
+    allow_origins=[FRONTEND_URL, "http://127.0.0.1:5173"], 
+    allow_credentials=True,
+    allow_methods=["GET", "POST"], # Restrict allowed methods
+    allow_headers=["Authorization", "Content-Type"],
 )
 
-@app.middleware("http")
-async def process_time_middleware(request: Request, call_next: Callable) -> Response:
-    start_time = time.time()
-    response = await call_next(request)
-    process_time = time.time() - start_time
-    response.headers["X-Process-Time-Sec"] = str(round(process_time, 4))
-    return response
-
-# --- ADVANCED: WebSocket Connection Manager ---
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            try:
-                await connection.send_text(message)
-            except Exception:
-                pass
-
-ws_manager = ConnectionManager()
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # --- ADVANCED: True Vector Database (RAG) ---
 class LightweightVectorDB:
@@ -221,10 +195,30 @@ async def query_sop_oracle(req: OracleRequest, client: Groq = Depends(get_ai_cli
     except Exception as e:
         raise HTTPException(status_code=500, detail="Vector DB unreachable.")
 
-@app.get("/api/dashboard")
-async def get_dashboard_data(minutes: int = 0, client: Groq = Depends(get_ai_client)):
-    zones = DASHBOARD_STATES.get(minutes, DASHBOARD_STATES[0])
-    time_context = "Live State" if minutes == 0 else f"+{minutes} Min Forecast"
-    prompt = f"Analyze this {time_context} stadium state. Densities: {zones}. Provide 2-bullet summary: 1. Biggest Risk 2. Action"
-    res = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model="llama-3.1-8b-instant", temperature=0.2)
-    return {"zones": zones, "ai_briefing": res.choices[0].message.content, "active_announcement": app_state["active_announcement"], "timeframe": minutes}
+@app.get("/api/dashboard", tags=["Operations"])
+def get_dashboard_data(minutes: int = 0) -> dict:
+    """Retrieves live or predictive density data and generates an AI risk briefing."""
+    try:
+        zones = DASHBOARD_STATES.get(minutes, DASHBOARD_STATES[0])
+        time_context = "Live Current State"
+        if minutes == 15: time_context = "+15 Minutes (Pre-Kickoff Forecast)"
+        elif minutes == 30: time_context = "+30 Minutes (Match Active Forecast)"
+
+        analysis_prompt = f"""
+        Analyze this stadium state: {time_context}. Densities: {zones}.
+        Provide a 2-bullet executive summary: 1. Biggest Risk 2. Recommended Action
+        """
+        completion = groq_client.chat.completions.create(
+            messages=[{"role": "user", "content": analysis_prompt}],
+            model="llama-3.1-8b-instant", temperature=0.2
+        )
+        
+        return {
+            "zones": zones,
+            "ai_briefing": completion.choices[0].message.content,
+            "active_announcement": app_state["active_announcement"],
+            "timeframe": minutes
+        }
+    except Exception as e:
+        logger.error(f"Dashboard Error: {e}")
+        raise HTTPException(status_code=500, detail="Telemetry sync failed.")
