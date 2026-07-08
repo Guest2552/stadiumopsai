@@ -30,7 +30,7 @@ load_dotenv()
 app = FastAPI(title="StadiumOps AI: FIFA 2026 Core Engine", version="5.0.0")
 
 # SECURITY: Restrict CORS to specific frontend origins instead of wildcards ["*"]
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://stadiumopsai.vercel.app/")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_URL, "http://127.0.0.1:5173"], 
