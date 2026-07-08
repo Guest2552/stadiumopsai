@@ -1,31 +1,23 @@
 """
-Database configuration and connection management.
-Utilizes SQLite for rapid hackathon prototyping with SQLAlchemy ORM.
+Core database configuration for StadiumOps AI.
+Provides real-time state persistence for tournament operations.
 """
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
 from typing import Generator
 
-# SQLite database URL
 SQLALCHEMY_DATABASE_URL = "sqlite:///./stadiumops.db"
 
-# Create the SQLAlchemy engine
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, 
-    connect_args={"check_same_thread": False} # Required for SQLite in FastAPI
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
 
-# Create a SessionLocal class for database sessions
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Base class for the database models
 Base = declarative_base()
 
-def get_db() -> Generator:
-    """
-    Dependency to get a database session for each request.
-    Ensures the database connection is closed after the request is complete.
-    """
+def get_db() -> Generator[Session, None, None]:
+    """Dependency injection to securely yield a database session."""
     db = SessionLocal()
     try:
         yield db

@@ -1,23 +1,24 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import axios from 'axios';
-import { MessageCircle, Send, Globe, LayoutDashboard, User, Activity, Megaphone, Map, AlertTriangle, Volume2, Languages, RefreshCw, Clock, BookOpen, Search, Camera, Database } from 'lucide-react';
+import { MessageCircle, Send, Globe, LayoutDashboard, User, Activity, Megaphone, Map, AlertTriangle, Volume2, Languages, RefreshCw, Clock, BookOpen, Search, Camera, Database, ChevronRight, Fingerprint } from 'lucide-react';
 
 const SUPPORTED_LANGUAGES = [
   { name: 'English', code: 'en-US' }, { name: 'Hindi', code: 'hi-IN' }, { name: 'Tamil', code: 'ta-IN' }, { name: 'Telugu', code: 'te-IN' }, { name: 'Malayalam', code: 'ml-IN' }, { name: 'Spanish', code: 'es-ES' }, { name: 'French', code: 'fr-FR' }, { name: 'German', code: 'de-DE' }, { name: 'Japanese', code: 'ja-JP' }, { name: 'Korean', code: 'ko-KR' }
 ];
 
-const API_URL = "http://localhost:8000"; // Update to Render URL for final deploy
+// Switch to your Render URL for production
+const API_URL = "https://stadiumopsai.onrender.com";
 const WS_URL = API_URL.replace(/^http/, 'ws');
 
 const apiClient = axios.create({ baseURL: API_URL, headers: { 'Content-Type': 'application/json' }, timeout: 30000 });
 
 function App() {
-  const [currentView, setCurrentView] = useState('fan'); 
+  const [currentView, setCurrentView] = useState('ops'); 
   const [activeAnnouncement, setActiveAnnouncement] = useState(null);
   const [availableVoices, setAvailableVoices] = useState([]);
 
-  // States
-  const [messages, setMessages] = useState([{ role: 'assistant', content: 'Welcome! Ask me anything, or use the Smart Router below.' }]);
+  // Fan States
+  const [messages, setMessages] = useState([{ role: 'assistant', content: 'Welcome to the FIFA 2026 AI Concierge. How can I assist you today?' }]);
   const [input, setInput] = useState('');
   const [fanLang, setFanLang] = useState('English');
   const [location, setLocation] = useState('Gate 1');
@@ -27,6 +28,7 @@ function App() {
   const [routeLoading, setRouteLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // Ops States
   const [dashboardData, setDashboardData] = useState(null);
   const [dashLoading, setDashLoading] = useState(true);
   const [forecastTime, setForecastTime] = useState(0); 
@@ -37,7 +39,6 @@ function App() {
   const [oracleInput, setOracleInput] = useState('');
   const [oracleAnswer, setOracleAnswer] = useState(null);
   const [oracleLoading, setOracleLoading] = useState(false);
-  
   const [cctvLoading, setCctvLoading] = useState(false);
   const [cctvAlert, setCctvAlert] = useState(null);
   const [incidentLog, setIncidentLog] = useState([]); 
@@ -45,6 +46,7 @@ function App() {
   const scrollToBottom = useCallback(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), []);
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
+  // --- EVENT-DRIVEN WEBSOCKETS ---
   useEffect(() => {
     const ws = new WebSocket(`${WS_URL}/ws`);
     ws.onmessage = (event) => {
@@ -108,7 +110,7 @@ function App() {
   const handleBroadcast = async () => {
     const textToPush = translatedText || draftMsg;
     if (!textToPush) return;
-    await handleAPI('announcement', { message: textToPush, severity: 'warning' }, () => { setDraftMsg(''); setTranslatedText(''); });
+    await handleAPI('announcement', { message: textToPush, severity: 'critical' }, () => { setDraftMsg(''); setTranslatedText(''); });
   };
   const handleCCTVAnalysis = () => {
     setCctvAlert(null);
@@ -127,130 +129,175 @@ function App() {
   const handleOracleQuery = (e) => { e.preventDefault(); if (oracleInput) handleAPI('oracle', { query: oracleInput }, (d) => setOracleAnswer(d.answer || "Error connecting to Vector DB."), setOracleLoading); };
 
   const renderHeatmap = useMemo(() => {
-    const getHeatmapColor = (density) => density >= 85 ? 'bg-red-500/20 border-red-500 text-red-300' : density >= 60 ? 'bg-amber-500/20 border-amber-500 text-amber-300' : 'bg-emerald-500/20 border-emerald-500 text-emerald-300';
+    const getHeatmapStyle = (density) => {
+      if (density >= 85) return { bg: 'bg-rose-500/10', border: 'border-rose-500/50', text: 'text-rose-400', bar: 'bg-rose-500', shadow: 'shadow-[0_0_15px_rgba(244,63,94,0.2)]' };
+      if (density >= 60) return { bg: 'bg-amber-500/10', border: 'border-amber-500/50', text: 'text-amber-400', bar: 'bg-amber-500', shadow: 'shadow-[0_0_15px_rgba(245,158,11,0.2)]' };
+      return { bg: 'bg-emerald-500/10', border: 'border-emerald-500/50', text: 'text-emerald-400', bar: 'bg-emerald-500', shadow: 'shadow-[0_0_15px_rgba(16,185,129,0.1)]' };
+    };
+
     return (
-      <div aria-live="polite" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {dashboardData?.zones?.map((zone) => (
-          <div key={zone.id} className={`p-4 border rounded-xl shadow-sm transition-all duration-500 ${getHeatmapColor(zone.density)}`}>
-            <div className="flex justify-between items-start">
-              <span className="font-semibold text-sm text-white">{zone.name}</span>
-              <span className="text-xs bg-slate-900/60 px-2 py-0.5 rounded-md font-mono">{zone.density}% Cap</span>
+      <div aria-live="polite" className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {dashboardData?.zones?.map((zone) => {
+          const style = getHeatmapStyle(zone.density);
+          return (
+            <div key={zone.id} className={`p-4 rounded-2xl border backdrop-blur-sm transition-all duration-700 ${style.bg} ${style.border} ${style.shadow}`}>
+              <div className="flex justify-between items-end mb-3">
+                <span className="font-bold text-sm text-slate-200 tracking-wide">{zone.name}</span>
+                <span className={`text-xl font-black font-mono ${style.text}`}>{zone.density}%</span>
+              </div>
+              {/* Sci-Fi Progress Bar */}
+              <div className="w-full bg-black/40 rounded-full h-1.5 overflow-hidden">
+                <div className={`h-full ${style.bar} transition-all duration-1000 ease-out rounded-full`} style={{ width: `${zone.density}%` }}></div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }, [dashboardData]);
 
   return (
-    <div className="flex flex-col h-screen bg-slate-900 text-slate-100 font-sans">
-      <header role="banner" className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-slate-700">
+    // Unique Dark Mesh Gradient Background
+    <div className="flex flex-col h-screen bg-[#0B0F19] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(37,99,235,0.15),rgba(255,255,255,0))] text-slate-100 font-sans overflow-hidden">
+      
+      {/* Glassmorphic Header */}
+      <header role="banner" className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-black/20 backdrop-blur-xl z-50">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-600 rounded-full text-white"><MessageCircle size={24} aria-hidden="true" /></div>
-          <div><h1 className="text-xl font-bold tracking-wide">StadiumOps AI</h1><span className="text-xs text-slate-400 sr-only">Real-time decision support for FIFA 2026</span></div>
+          <div className="p-2.5 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]">
+            <Fingerprint size={24} aria-hidden="true" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">STADIUM<span className="text-cyan-400">OPS</span>.AI</h1>
+          </div>
         </div>
-        <nav aria-label="Main Navigation" className="flex bg-slate-900 p-1 rounded-xl border border-slate-700">
-          <button aria-pressed={currentView === 'fan'} onClick={() => setCurrentView('fan')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${currentView === 'fan' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}><User size={16} aria-hidden="true"/> Fan View</button>
-          <button aria-pressed={currentView === 'ops'} onClick={() => setCurrentView('ops')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${currentView === 'ops' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}><LayoutDashboard size={16} aria-hidden="true"/> Ops View</button>
+        <nav aria-label="Main Navigation" className="flex p-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-md">
+          <button aria-pressed={currentView === 'fan'} onClick={() => setCurrentView('fan')} className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold transition-all cursor-pointer ${currentView === 'fan' ? 'bg-white/10 text-cyan-400 shadow-lg' : 'text-slate-500 hover:text-white'}`}><User size={16} aria-hidden="true"/> Fan Portal</button>
+          <button aria-pressed={currentView === 'ops'} onClick={() => setCurrentView('ops')} className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold transition-all cursor-pointer ${currentView === 'ops' ? 'bg-white/10 text-indigo-400 shadow-lg' : 'text-slate-500 hover:text-white'}`}><LayoutDashboard size={16} aria-hidden="true"/> Command Center</button>
         </nav>
       </header>
 
+      {/* Cyberpunk Emergency Banner */}
       {activeAnnouncement && (
-        <div role="alert" aria-live="assertive" aria-atomic="true" className={`w-full py-3 px-6 flex items-center justify-between shadow-md animate-pulse ${activeAnnouncement.severity === 'critical' ? 'bg-red-600 text-white' : 'bg-amber-500 text-black'}`}>
-          <div className="flex items-center gap-3 font-semibold text-sm">
-            <AlertTriangle size={18} aria-hidden="true" /><span>STADIUM ALERT: {activeAnnouncement.message}</span>
+        <div role="alert" aria-live="assertive" aria-atomic="true" className={`w-full py-3 px-6 flex items-center justify-between shadow-[0_4px_20px_rgba(0,0,0,0.5)] z-40 border-b ${activeAnnouncement.severity === 'critical' ? 'bg-rose-600/90 border-rose-400 text-white animate-pulse' : 'bg-amber-500/90 border-amber-300 text-black'}`}>
+          <div className="flex items-center gap-3 font-black tracking-widest text-sm uppercase">
+            <AlertTriangle size={18} aria-hidden="true" /><span>{activeAnnouncement.severity} OVERRIDE: {activeAnnouncement.message}</span>
           </div>
-          <button aria-label="Listen to Alert" onClick={() => playAudio(activeAnnouncement.message, 'English')} className="p-2 bg-black/20 hover:bg-black/40 rounded-full transition-colors cursor-pointer"><Volume2 size={16} aria-hidden="true"/></button>
+          <button aria-label="Listen to Alert" onClick={() => playAudio(activeAnnouncement.message, 'English')} className="p-2 bg-black/20 hover:bg-black/40 rounded-full transition-colors cursor-pointer backdrop-blur-sm"><Volume2 size={16} aria-hidden="true"/></button>
         </div>
       )}
 
       {currentView === 'fan' ? (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <section aria-label="Crowd Management Router" className="bg-slate-800 px-6 py-4 border-b border-slate-700">
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+          {/* Fan Background Accent */}
+          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none" />
+
+          <section aria-label="Crowd Management Router" className="px-6 py-5 border-b border-white/5 bg-white/[0.02] backdrop-blur-md z-10">
             <div className="max-w-4xl mx-auto">
-              <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2"><Map size={16} aria-hidden="true"/> Crowd-Aware Route Finder</h3>
+              <h3 className="text-xs font-black text-cyan-500 mb-3 flex items-center gap-2 tracking-widest uppercase"><Map size={14} aria-hidden="true"/> Neural Navigation</h3>
               <div className="flex flex-wrap gap-3 items-center">
-                <select aria-label="Starting Location" value={location} onChange={(e) => setLocation(e.target.value)} className="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white flex-1 cursor-pointer"><option value="Gate 1">Gate 1</option><option value="Gate 2">Gate 2</option><option value="Gate 3">Gate 3</option></select>
-                <span aria-hidden="true" className="text-slate-500">→</span>
-                <select aria-label="Destination" value={destination} onChange={(e) => setDestination(e.target.value)} className="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white flex-1 cursor-pointer"><option value="Section 204">Section 204</option><option value="Gate 4">Gate 4</option><option value="Food Court B">Food Court B</option></select>
-                <div className="flex items-center gap-2 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 flex-1"><Globe size={16} className="text-blue-400" aria-hidden="true" /><select aria-label="Language Selection" value={fanLang} onChange={(e) => setFanLang(e.target.value)} className="bg-transparent text-sm text-white focus:outline-none w-full cursor-pointer">{SUPPORTED_LANGUAGES.map(l => <option key={l.name} value={l.name} className="bg-slate-800">{l.name}</option>)}</select></div>
-                <button onClick={handleGetRoute} disabled={routeLoading} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium cursor-pointer focus:ring-2 focus:ring-emerald-400 focus:outline-none">{routeLoading ? 'Routing...' : 'Find Route'}</button>
+                <select aria-label="Starting Location" value={location} onChange={(e) => setLocation(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 flex-1 cursor-pointer focus:border-cyan-500 focus:outline-none"><option value="Gate 1">Gate 1</option><option value="Gate 2">Gate 2</option><option value="Gate 3">Gate 3</option></select>
+                <ChevronRight size={16} className="text-slate-600" />
+                <select aria-label="Destination" value={destination} onChange={(e) => setDestination(e.target.value)} className="bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-200 flex-1 cursor-pointer focus:border-cyan-500 focus:outline-none"><option value="Section 204">Section 204</option><option value="Gate 4">Gate 4</option><option value="Food Court B">Food Court B</option></select>
+                <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 flex-1 focus-within:border-cyan-500"><Globe size={16} className="text-cyan-500" aria-hidden="true" /><select aria-label="Language Selection" value={fanLang} onChange={(e) => setFanLang(e.target.value)} className="bg-transparent text-sm text-slate-200 focus:outline-none w-full cursor-pointer">{SUPPORTED_LANGUAGES.map(l => <option key={l.name} value={l.name} className="bg-slate-900">{l.name}</option>)}</select></div>
+                <button onClick={handleGetRoute} disabled={routeLoading} className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all">{routeLoading ? 'Calculating...' : 'Generate Path'}</button>
               </div>
               {routeAdvice && (
-                <div aria-live="polite" className="mt-4 p-3 bg-emerald-900/30 border border-emerald-500/50 rounded-lg text-emerald-200 text-sm flex justify-between items-start gap-4">
-                  <p>{routeAdvice}</p><button aria-label="Listen to Route" onClick={() => playAudio(routeAdvice, fanLang)} className="text-emerald-400 mt-0.5 cursor-pointer focus:ring-2 focus:ring-emerald-400 rounded"><Volume2 size={16} aria-hidden="true" /></button>
+                <div aria-live="polite" className="mt-4 p-4 bg-cyan-950/30 border border-cyan-500/30 rounded-xl text-cyan-100 text-sm flex justify-between items-start gap-4 shadow-inner backdrop-blur-md">
+                  <p className="leading-relaxed">{routeAdvice}</p><button aria-label="Listen to Route" onClick={() => playAudio(routeAdvice, fanLang)} className="text-cyan-400 mt-0.5 cursor-pointer hover:text-white"><Volume2 size={18} aria-hidden="true" /></button>
                 </div>
               )}
             </div>
           </section>
 
-          <main aria-label="AI Chat Concierge" aria-live="polite" className="flex-1 overflow-y-auto p-6 space-y-4 max-w-4xl mx-auto w-full">
+          <main aria-label="AI Chat Concierge" aria-live="polite" className="flex-1 overflow-y-auto p-6 space-y-6 max-w-4xl mx-auto w-full z-10 scrollbar-hide">
             {messages.map((msg, index) => (
               <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] p-4 rounded-3xl whitespace-pre-wrap flex flex-col gap-2 shadow-md ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-slate-800 text-slate-100 rounded-bl-sm border border-slate-700'}`}>
-                  <span>{msg.content}</span>
-                  {msg.role === 'assistant' && <button aria-label="Listen to Message" onClick={() => playAudio(msg.content, fanLang)} className="self-end text-slate-400 hover:text-blue-400 mt-1 cursor-pointer"><Volume2 size={16} aria-hidden="true" /></button>}
+                <div className={`max-w-[80%] p-4 rounded-3xl whitespace-pre-wrap flex flex-col gap-2 shadow-lg backdrop-blur-md ${msg.role === 'user' ? 'bg-gradient-to-br from-blue-600 to-cyan-600 text-white rounded-br-sm border border-blue-400/50' : 'bg-white/5 text-slate-200 rounded-bl-sm border border-white/10'}`}>
+                  <span className="leading-relaxed text-sm">{msg.content}</span>
+                  {msg.role === 'assistant' && <button aria-label="Listen to Message" onClick={() => playAudio(msg.content, fanLang)} className="self-end text-slate-400 hover:text-cyan-400 mt-1 cursor-pointer"><Volume2 size={16} aria-hidden="true" /></button>}
                 </div>
               </div>
             ))}
+            {chatLoading && (
+              <div className="flex justify-start">
+                <div className="bg-white/5 border border-white/10 p-4 rounded-3xl rounded-bl-sm flex items-center gap-2 shadow-lg backdrop-blur-md">
+                  <span className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce"></span><span className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce [animation-delay:0.2s]"></span><span className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </main>
 
-          <footer className="p-4 bg-slate-800 border-t border-slate-700">
-            <form onSubmit={handleSendChat} className="max-w-4xl mx-auto flex gap-3">
-              <input aria-label="Chat Input" type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Ask your Multilingual Assistant...`} className="flex-1 bg-slate-900 border border-slate-700 rounded-full px-5 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
-              <button aria-label="Send Message" type="submit" disabled={chatLoading || !input.trim()} className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-5 py-3 rounded-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"><Send size={18} aria-hidden="true" /></button>
+          <footer className="p-6 border-t border-white/5 bg-black/20 backdrop-blur-xl z-10">
+            <form onSubmit={handleSendChat} className="max-w-4xl mx-auto flex gap-3 relative">
+              <input aria-label="Chat Input" type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Communicate with Concierge...`} className="flex-1 bg-black/50 border border-white/10 rounded-full pl-6 pr-14 py-4 text-sm text-white focus:outline-none focus:border-cyan-500 focus:shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all" />
+              <button aria-label="Send Message" type="submit" disabled={chatLoading || !input.trim()} className="absolute right-2 top-2 bottom-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white w-10 h-10 flex items-center justify-center rounded-full cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.5)] transition-all"><Send size={16} aria-hidden="true" className="ml-1" /></button>
             </form>
           </footer>
         </div>
       ) : (
-        <main aria-label="Operational Intelligence Dashboard" className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto w-full space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
+        <main aria-label="Operational Intelligence Dashboard" className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto w-full space-y-6 relative z-10">
+          
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* LEFT COLUMN */}
+            <div className="xl:col-span-2 space-y-6">
               
-              <section aria-label="Density Heatmap" className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-md">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold flex items-center gap-2">Crowd Density Matrix</h2>
-                  <div role="group" aria-label="Time Forecast Controls" className="flex bg-slate-900 rounded-lg p-1 border border-slate-600">
-                    <button aria-pressed={forecastTime === 0} onClick={() => setForecastTime(0)} className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 cursor-pointer ${forecastTime === 0 ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 'text-slate-400 hover:text-white'}`}><Activity size={14} aria-hidden="true"/> LIVE</button>
-                    <button aria-pressed={forecastTime === 15} onClick={() => setForecastTime(15)} className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 cursor-pointer ${forecastTime === 15 ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/50' : 'text-slate-400 hover:text-white'}`}><Clock size={14} aria-hidden="true"/> +15 MIN</button>
+              {/* Telemetry Matrix (Glassmorphism) */}
+              <section aria-label="Density Heatmap" className="bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[100px] rounded-full pointer-events-none" />
+                <div className="flex items-center justify-between mb-6 relative z-10">
+                  <h2 className="text-sm font-black text-indigo-400 tracking-widest uppercase flex items-center gap-2"><Activity size={16} aria-hidden="true"/> Live Telemetry Array</h2>
+                  <div role="group" aria-label="Time Forecast Controls" className="flex bg-black/40 rounded-full p-1 border border-white/10">
+                    <button aria-pressed={forecastTime === 0} onClick={() => setForecastTime(0)} className={`px-4 py-1.5 text-xs font-bold rounded-full transition-all cursor-pointer ${forecastTime === 0 ? 'bg-indigo-500 text-white shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'text-slate-500 hover:text-white'}`}>LIVE</button>
+                    <button aria-pressed={forecastTime === 15} onClick={() => setForecastTime(15)} className={`px-4 py-1.5 text-xs font-bold rounded-full transition-all cursor-pointer ${forecastTime === 15 ? 'bg-indigo-500 text-white shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'text-slate-500 hover:text-white'}`}>+15m PRED</button>
                   </div>
                 </div>
                 {renderHeatmap}
               </section>
 
-              <section aria-label="CCTV Vision AI Panel" className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-md">
-                 <div className="flex items-center justify-between mb-4">
+              {/* CCTV Interface (Sci-Fi Scanlines) */}
+              <section aria-label="CCTV Vision AI Panel" className="bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 shadow-2xl">
+                 <div className="flex items-center justify-between mb-5">
                    <div className="flex items-center gap-2 text-rose-400">
-                    <Camera size={18} aria-hidden="true" />
-                    <h2 className="text-sm font-bold uppercase tracking-wider">Vision AI: CCTV Feed Analysis</h2>
+                    <Camera size={16} aria-hidden="true" />
+                    <h2 className="text-sm font-black uppercase tracking-widest">Neural Vision Feed</h2>
                   </div>
                 </div>
-                <div className="flex gap-4 mb-4">
-                  <div className="w-1/3 aspect-video bg-slate-900 rounded-lg border border-slate-700 flex items-center justify-center relative overflow-hidden">
-                    <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] mix-blend-overlay"></div>
-                    <Camera size={32} className="text-slate-600" aria-hidden="true"/>
-                    <span className="absolute bottom-2 left-2 text-[10px] font-mono text-rose-500/70 font-bold bg-slate-900/80 px-1 rounded">Cam-04-REC</span>
+                <div className="flex flex-col sm:flex-row gap-6 mb-2">
+                  <div className="sm:w-2/5 aspect-video bg-black rounded-xl border border-white/10 flex items-center justify-center relative overflow-hidden group">
+                    {/* Fake Camera Feed Background */}
+                    <div className="absolute inset-0 opacity-30 bg-[url('https://images.unsplash.com/photo-1556056504-5c7696c4c28d?q=80&w=1000&auto=format&fit=crop')] bg-cover bg-center mix-blend-luminosity grayscale"></div>
+                    {/* Sci-Fi Grid Overlay */}
+                    <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
+                    
+                    {/* Animated Active Scanline */}
+                    {cctvLoading && <div className="absolute top-0 left-0 w-full h-1 bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,1)] animate-[bounce_1.5s_infinite] opacity-70 z-20"></div>}
+                    
+                    <span className="absolute top-3 left-3 flex items-center gap-1.5 text-[10px] font-mono text-rose-500 font-bold bg-black/60 px-2 py-0.5 rounded border border-rose-500/30 backdrop-blur-md z-10"><span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span> REC</span>
+                    <span className="absolute bottom-3 right-3 text-[10px] font-mono text-white/50 z-10 tracking-widest">CAM-04/SOUTH</span>
                   </div>
-                  <div className="flex-1 flex flex-col justify-center gap-3">
-                    <p className="text-xs text-slate-400">Run multimodal analysis on camera feeds to detect anomalies. Identified incidents are automatically logged to the SQLite database.</p>
-                    <button aria-label="Analyze Active Camera Feed" onClick={handleCCTVAnalysis} disabled={cctvLoading} className="w-fit bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium cursor-pointer flex gap-2 items-center focus:outline-none focus:ring-2 focus:ring-rose-400">
-                      {cctvLoading ? <RefreshCw size={16} className="animate-spin" aria-hidden="true"/> : <Search size={16} aria-hidden="true"/>}
-                      {cctvLoading ? 'Processing Image...' : 'Analyze Active Feed'}
+
+                  <div className="flex-1 flex flex-col justify-center gap-4">
+                    <p className="text-xs text-slate-400 leading-relaxed font-mono">Vision agents process feed data to detect crowding, security breaches, and hazards. Flagged anomalies are written directly to secure operational logs.</p>
+                    <button aria-label="Analyze Active Camera Feed" onClick={handleCCTVAnalysis} disabled={cctvLoading} className="w-fit bg-rose-600/20 border border-rose-500 hover:bg-rose-600 hover:shadow-[0_0_15px_rgba(244,63,94,0.4)] disabled:opacity-50 text-rose-100 px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer flex gap-2 items-center transition-all">
+                      {cctvLoading ? <RefreshCw size={14} className="animate-spin text-rose-400" aria-hidden="true"/> : <Search size={14} className="text-rose-400" aria-hidden="true"/>}
+                      {cctvLoading ? 'Running Inference...' : 'Engage Vision AI'}
                     </button>
                   </div>
                 </div>
+                
+                {/* Audit Log Terminal */}
                 {incidentLog.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-slate-700">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2"><Database size={14} aria-hidden="true"/> SQLite Incident Audit Log</h3>
-                    <div aria-live="polite" className="space-y-2">
+                  <div className="mt-6 pt-5 border-t border-white/5">
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2"><Database size={12} aria-hidden="true"/> Secure Event Ledger</h3>
+                    <div aria-live="polite" className="space-y-2 max-h-40 overflow-y-auto scrollbar-hide pr-2">
                       {incidentLog.map(incident => (
-                        <div key={incident.id} className="p-3 bg-slate-900 rounded-md border border-slate-700 text-xs text-slate-300 flex flex-col gap-1">
-                           <div className="flex justify-between text-slate-500 font-mono text-[10px]">
-                             <span>ID: #{incident.id} | Zone: {incident.zone_id}</span>
-                             <span>STATUS: {incident.status.toUpperCase()}</span>
+                        <div key={incident.id} className="p-3 bg-black/40 rounded-lg border border-white/5 text-xs text-slate-300 flex flex-col gap-1.5 hover:border-white/10 transition-colors">
+                           <div className="flex justify-between text-slate-500 font-mono text-[9px] uppercase tracking-wider">
+                             <span>ID_REF: {incident.id} // LOC: {incident.zone_id}</span>
+                             <span className="text-rose-400 border border-rose-400/30 px-1.5 rounded">{incident.status}</span>
                            </div>
-                           <p>{incident.summary}</p>
+                           <p className="font-mono text-slate-400 leading-relaxed">{incident.summary}</p>
                         </div>
                       ))}
                     </div>
@@ -258,55 +305,60 @@ function App() {
                 )}
               </section>
 
-              <section aria-label="Real-time Decision Support Oracle" className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-md">
-                 <div className="flex items-center gap-2 text-emerald-400 mb-4">
-                  <BookOpen size={18} aria-hidden="true" />
-                  <h2 className="text-sm font-bold uppercase tracking-wider">SOP Command Oracle (Vector Database)</h2>
-                </div>
-                <form onSubmit={handleOracleQuery} className="flex gap-3 mb-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-2.5 text-slate-500" size={16} aria-hidden="true" />
-                    <input aria-label="Search Operating Procedures" type="text" value={oracleInput} onChange={(e) => setOracleInput(e.target.value)} placeholder="Query vector space... (e.g. 'What is the drone protocol?')" className="w-full bg-slate-900 border border-slate-600 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" />
-                  </div>
-                  <button type="submit" disabled={oracleLoading || !oracleInput} className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400">
-                    {oracleLoading ? 'Running Cosine Similarity...' : 'Ask Oracle'}
-                  </button>
-                </form>
-                {oracleAnswer && <div aria-live="polite" className="p-4 bg-emerald-900/20 border border-emerald-500/30 rounded-lg text-sm text-emerald-100 whitespace-pre-wrap leading-relaxed">{oracleAnswer}</div>}
-              </section>
             </div>
 
+            {/* RIGHT COLUMN */}
             <div className="space-y-6">
-              <section aria-label="Translation Studio" className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-md">
-                <div className="flex items-center gap-2 text-blue-400 mb-4">
-                  <Languages size={18} aria-hidden="true" /><h2 className="text-sm font-bold uppercase tracking-wider">Translation Studio</h2>
+              
+              {/* RAG Oracle (Terminal Interface) */}
+              <section aria-label="Real-time Decision Support Oracle" className="bg-[#0A1929] p-6 rounded-3xl border border-[#1E3A8A] shadow-[0_0_30px_rgba(30,58,138,0.15)] relative overflow-hidden">
+                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-cyan-400 to-blue-600"></div>
+                 <div className="flex items-center gap-2 text-cyan-400 mb-5">
+                  <BookOpen size={16} aria-hidden="true" />
+                  <h2 className="text-sm font-black uppercase tracking-widest">Protocol Oracle</h2>
                 </div>
-                <div className="space-y-3">
-                  <textarea aria-label="Broadcast Message Input" value={draftMsg} onChange={(e) => setDraftMsg(e.target.value)} placeholder="Type stadium instruction..." className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-blue-500" rows="3" />
+                <form onSubmit={handleOracleQuery} className="flex flex-col gap-3 mb-2">
+                  <div className="relative w-full">
+                    <span className="absolute left-3 top-3.5 text-cyan-500 font-mono text-sm font-bold">&gt;</span>
+                    <input aria-label="Search Operating Procedures" type="text" value={oracleInput} onChange={(e) => setOracleInput(e.target.value)} placeholder="Query vector space..." className="w-full bg-black/50 border border-cyan-900 rounded-lg pl-8 pr-4 py-3 text-xs font-mono text-cyan-100 focus:outline-none focus:border-cyan-500 transition-colors" />
+                  </div>
+                  <button type="submit" disabled={oracleLoading || !oracleInput} className="w-full bg-cyan-900/40 border border-cyan-700 hover:bg-cyan-800 disabled:opacity-50 text-cyan-100 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer transition-colors">
+                    {oracleLoading ? 'Searching Vectors...' : 'Execute Query'}
+                  </button>
+                </form>
+                {oracleAnswer && <div aria-live="polite" className="mt-4 p-4 bg-black/60 border-l-2 border-cyan-500 rounded-r-lg text-xs text-cyan-300 font-mono whitespace-pre-wrap leading-loose">{oracleAnswer}</div>}
+              </section>
+
+              {/* Broadcast Studio */}
+              <section aria-label="Translation Studio" className="bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 shadow-2xl">
+                <div className="flex items-center gap-2 text-amber-400 mb-5">
+                  <Megaphone size={16} aria-hidden="true" /><h2 className="text-sm font-black uppercase tracking-widest">Global Override</h2>
+                </div>
+                <div className="space-y-4">
+                  <textarea aria-label="Broadcast Message Input" value={draftMsg} onChange={(e) => setDraftMsg(e.target.value)} placeholder="Draft emergency transmission..." className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-xs text-white focus:outline-none focus:border-amber-500 resize-none" rows="3" />
                   <div className="flex gap-2">
-                    <select aria-label="Target Language" value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white flex-1 cursor-pointer">
-                      {SUPPORTED_LANGUAGES.map(l => <option key={l.name} value={l.name} className="bg-slate-800">{l.name}</option>)}
+                    <select aria-label="Target Language" value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-300 flex-1 cursor-pointer focus:outline-none focus:border-amber-500">
+                      {SUPPORTED_LANGUAGES.map(l => <option key={l.name} value={l.name}>{l.name}</option>)}
                     </select>
-                    <button onClick={handleTranslate} disabled={isTranslating || !draftMsg} className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer shadow-sm">{isTranslating ? <RefreshCw size={16} className="animate-spin" aria-hidden="true" /> : 'Translate'}</button>
+                    <button onClick={handleTranslate} disabled={isTranslating || !draftMsg} className="bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer text-xs font-bold uppercase tracking-wider transition-all">{isTranslating ? <RefreshCw size={14} className="animate-spin" aria-hidden="true" /> : 'Translate'}</button>
                   </div>
-                  {translatedText && <div aria-live="polite" className="mt-2 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg"><p className="text-sm text-blue-100">{translatedText}</p></div>}
-                  <div className="flex gap-2 pt-2 border-t border-slate-700 mt-4">
-                    <button onClick={() => playAudio(translatedText || draftMsg, targetLang)} disabled={!draftMsg && !translatedText} className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white font-medium py-2 rounded-lg cursor-pointer text-sm shadow-sm flex justify-center items-center gap-2"><Volume2 size={16} aria-hidden="true" /> Preview</button>
-                    <button onClick={handleBroadcast} disabled={!draftMsg && !translatedText} className="flex-1 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold py-2 rounded-lg cursor-pointer text-sm shadow-md flex justify-center items-center gap-2"><Megaphone size={16} aria-hidden="true" /> Push Live</button>
-                  </div>
+                  {translatedText && <div aria-live="polite" className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-100 text-xs leading-relaxed">{translatedText}</div>}
+                  <button onClick={handleBroadcast} disabled={!draftMsg && !translatedText} className="w-full bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 disabled:opacity-50 text-white font-black uppercase tracking-widest py-3 rounded-xl cursor-pointer text-xs shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all flex justify-center items-center gap-2">Transmit Push Alert</button>
                 </div>
               </section>
 
-              <section aria-label="Operational Intelligence Briefing" className="bg-indigo-950/80 p-5 rounded-xl border border-indigo-500/30 shadow-md">
-                <div className="flex items-center justify-between mb-3">
+              {/* AI Briefing */}
+              <section aria-label="Operational Intelligence Briefing" className="bg-indigo-950/40 backdrop-blur-xl p-6 rounded-3xl border border-indigo-500/30 shadow-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-indigo-500/20 pb-3">
                   <div className="flex items-center gap-2 text-indigo-400">
-                    <Activity size={18} aria-hidden="true" />
-                    <h2 className="text-sm font-bold uppercase tracking-wider">{forecastTime === 0 ? 'Live AI Briefing' : 'Predictive AI Briefing'}</h2>
+                    <Activity size={16} aria-hidden="true" />
+                    <h2 className="text-[10px] font-black uppercase tracking-widest">{forecastTime === 0 ? 'Live Synthesis' : 'Predictive Synthesis'}</h2>
                   </div>
                   {dashLoading && <RefreshCw size={14} className="text-indigo-400 animate-spin" aria-label="Loading..." />}
                 </div>
-                <div aria-live="polite" className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed font-mono text-xs">{dashboardData?.ai_briefing}</div>
+                <div aria-live="polite" className="text-xs text-indigo-100/80 whitespace-pre-wrap leading-relaxed font-mono">{dashboardData?.ai_briefing || "Awaiting telemetry..."}</div>
               </section>
+
             </div>
           </div>
         </main>
